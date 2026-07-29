@@ -6,17 +6,38 @@ import os
 import pandas as pd
 import sqlite3
 
+import os
+import pandas as pd
+import sqlite3
+
 BASE_DIR = os.path.dirname(__file__)
 DB_PATH = os.path.join(BASE_DIR, "data", "ecommerce.db")
 EXCEL_PATH = os.path.join(BASE_DIR, "data", "Realmart_Sales_Dataset.xlsx")
 
-if not os.path.exists(DB_PATH):
-    print("Database not found — building it from Excel...")
+
+def database_needs_build():
+    if not os.path.exists(DB_PATH):
+        return True
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='orders'")
+        exists = cursor.fetchone() is not None
+        conn.close()
+        return not exists
+    except Exception:
+        return True
+
+
+if database_needs_build():
+    print("Building database from Excel...")
     df = pd.read_excel(EXCEL_PATH)
     conn = sqlite3.connect(DB_PATH)
     df.to_sql("orders", conn, if_exists="replace", index=False)
     conn.close()
-    print("Database created successfully.")
+    print(f"Database created successfully with {len(df)} rows.")
+else:
+    print("Database already has 'orders' table, skipping build.")
 
 app = FastAPI()
 
