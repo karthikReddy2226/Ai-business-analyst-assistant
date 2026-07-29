@@ -2,19 +2,24 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from agent import ask_agent, generate_insights, generate_chart_data, generate_question_insights
+import os
+import pandas as pd
+import sqlite3
+
+BASE_DIR = os.path.dirname(__file__)
+DB_PATH = os.path.join(BASE_DIR, "data", "ecommerce.db")
+EXCEL_PATH = os.path.join(BASE_DIR, "data", "Realmart_Sales_Dataset.xlsx")
+
+if not os.path.exists(DB_PATH):
+    print("Database not found — building it from Excel...")
+    df = pd.read_excel(EXCEL_PATH)
+    conn = sqlite3.connect(DB_PATH)
+    df.to_sql("orders", conn, if_exists="replace", index=False)
+    conn.close()
+    print("Database created successfully.")
 
 app = FastAPI()
 
-
-import os
-import subprocess
-
-DB_PATH = os.path.join(os.path.dirname(__file__), "data", "ecommerce.db")
-
-if not os.path.exists(DB_PATH):
-    subprocess.run(["python", "setup_db.py"], cwd=os.path.dirname(__file__))
-
-    
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],
@@ -38,14 +43,19 @@ def ask_question(request: QuestionRequest):
     return {"answer": ask_agent(request.question)}
 
 
-@app.post("/question-insights")
-def question_insights(request: QuestionRequest):
-    return {"insights": generate_question_insights(request.question)}
+@app.get("/insights")
+def insights():
+    return {"insights": generate_insights()}
+
 
 @app.post("/chart-data")
 def chart_data(request: QuestionRequest):
     return generate_chart_data(request.question)
 
+
+@app.post("/question-insights")
+def question_insights(request: QuestionRequest):
+    return {"insights": generate_question_insights(request.question)}
 
 
 from tools.analytics import (
@@ -70,4 +80,3 @@ def revenue_by_date():
 @app.get("/analytics/summary")
 def summary():
     return get_summary_stats()
-
